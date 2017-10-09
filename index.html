@@ -1,0 +1,135 @@
+<html>
+
+<head>
+
+    <style>
+        .app {
+            background-color: #FFF684;
+            margin: 30px auto;
+            padding: 10px 20px;
+            width: 600px;
+            font-family: sans-serif;
+            min-height: 600px;
+        }
+
+        .app .add {
+            display: flex;
+        }
+
+        .app .add button {
+            background-color: #FF8744;
+            color: white;
+            border: none;
+            padding: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            height: 40px;
+        }
+
+        .app .add input[name='content'] {
+            height: 40px;
+            flex-grow: 1;
+            padding: 5px;
+            border: none;
+        }
+
+        ul {
+            list-style: none;
+            -webkit-padding-start: 0;
+        }
+
+        .todo li {
+            margin: 3px 0;
+            padding: 10px;
+            display: block;
+            background-color: rgba(255, 255, 255, 0.5);
+            border-bottom: rgba(255, 255, 255, 0.6);
+        }
+
+        .todo li.done {
+            text-decoration: line-through;
+        }
+
+        .todo li .remove {
+            float: right;
+            padding: 3px;
+            color: red;
+            font-weight: bold;
+            text-decoration: none;
+        }
+    </style>
+
+</head>
+
+<body>
+    <div class="app row">
+        <h1>TODO</h1>
+        <div class="add">
+            <input name="content" v-model="newItemContent" placeholder="Type in new item..." type="text" />
+            <button v-on:click="addItem()">Add item</button>
+        </div>
+        <ul class="col-sm-12 todo this-week" style="display: none;" v-show="todoItems.length">
+            <li v-for="todo in todoItems" v-bind:class="{ done: todo.isChecked }">
+                <input type="checkbox" v-model="todo.isChecked"> {{ todo.content }}
+                <a href="#" class="remove" v-on:click="removeItem(todo)">✘</a>
+            </li>
+        </ul>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.4.4/vue.js"></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.4.4/vue.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/then-request/2.2.0/request.min.js"></script>
+    <script>
+        var app = new Vue({
+            el: '.app',
+            data: {
+                newItemContent: '',
+                todoItems: []
+            },
+            methods: {
+                getItems() {
+                    request('GET', '/api/items')
+                        .getBody('utf8')
+                        .then(JSON.parse)
+                        .done((items) => {
+                            this.todoItems = items;
+                        });
+                },
+                addItem() {
+                    var item = {
+                        content: this.newItemContent,
+                        createdAt: new Date(),
+                        checked: false 
+                    };
+                    this.todoItems.unshift(item);
+
+                    request('POST', '/api/items', {
+                            "json": { content: this.newItemContent }
+                        })
+                        .catch(err => {
+                            var idx = this.todoItems.indexOf(item);
+                            this.todoItems.splice(idx, 1);
+                            throw err;
+                        });
+                },
+                removeItem(item) {
+                    var idx = this.todoItems.indexOf(item);
+                    this.todoItems.splice(idx, 1);
+                    request('DELETE', '/api/items', {
+                            "json": { id: item.id }
+                        })
+                        .catch(err => {
+                            this.todoItems.splice(idx, 0, item);
+                            throw err;
+                        });
+                },
+                initialize() {
+                    this.getItems();
+                }
+            }
+        }).initialize();
+    </script>
+</body>
+
+</html>

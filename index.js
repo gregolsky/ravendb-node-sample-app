@@ -30,7 +30,7 @@ app.route('/api/items')
         .then(result => {
             res.status(200);
             res.type("application/json");
-            res.send(JSON.stringify(result, null, 2));
+            res.send(JSON.stringify(result));
         })
         .catch(reason => {
             res.status(500);
@@ -40,13 +40,18 @@ app.route('/api/items')
     .post(function (req, res) {
         const { content } = req.body;
         const session = docStore.openSession();
-        session.store({
+        const item = {
             content: content,
             createdAt: new Date(),
             isChecked: false
-        }, null, "TodoItems")
-            .then(() => session.saveChanges())
-            .then(() => res.sendStatus(200));
+        };
+        session.store(item, null, "TodoItems")
+        .then(() => session.saveChanges())
+        .then(() => { 
+            res.status(200);
+            res.type("application/json");
+            res.send(JSON.stringify(item));
+        });
     })
     .put(function (req, res) {
         const { id, isChecked } = req.body;
@@ -81,7 +86,11 @@ app.route('/api/items')
         const session = docStore.openSession();
         session.delete(id)
         .then(() => session.saveChanges())
-        .then(() => res.sendStatus(200));
+        .then(() => res.sendStatus(200))
+        .catch(err => { 
+            res.status(500);
+            res.send(err);
+        });
     });
 
 const indexes = [

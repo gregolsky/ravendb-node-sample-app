@@ -130,6 +130,11 @@
                     request('POST', '/api/items', {
                             "json": { content: this.newItemContent }
                         })
+                        .getBody('utf8')
+                        .then(JSON.parse)
+                        .then(stored => {
+                          item.id = stored.id;  
+                        })
                         .catch(err => {
                             var idx = this.todoItems.indexOf(item);
                             this.todoItems.splice(idx, 1);

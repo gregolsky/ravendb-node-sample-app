@@ -1,4 +1,5 @@
 const path = require('path');
+const VError = require('verror');
 const { DocumentStore, PutIndexesOperation, IndexDefinition } = require('ravendb');
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -16,50 +17,77 @@ app.get('/', function (req, res) {
     res.sendFile(path.join(__dirname, "index.html"));
 });
 
-app.get('/api/items', function (req, res) {
-    const session = docStore.openSession();
+app.route('/api/items')
+    .get(function (req, res) {
+        const session = docStore.openSession();
 
-    session.query({
-        indexName: 'TodoItemsIndex',
+        session.query({
+            indexName: 'TodoItemsIndex',
+        })
+        .orderByDescending('createdAt')
+        .waitForNonStaleResults()
+        .all()
+        .then(result => {
+            res.status(200);
+            res.type("application/json");
+            res.send(JSON.stringify(result, null, 2));
+        })
+        .catch(reason => {
+            res.status(500);
+            res.send(reason);
+        });
     })
-    .orderByDescending('createdAt')
-    .waitForNonStaleResults()
-    .all()
-    .then(result => {
-        res.status(200);
-        res.type("application/json");
-        res.send(JSON.stringify(result, null, 2));
+    .post(function (req, res) {
+        const { content } = req.body;
+        const session = docStore.openSession();
+        session.store({
+            content: content,
+            createdAt: new Date(),
+            isChecked: false
+        }, null, "TodoItems")
+            .then(() => session.saveChanges())
+            .then(() => res.sendStatus(200));
     })
-    .catch(reason => {
-        res.status(500);
-        res.send(reason);
-    });
-});
-     //"url": "http://4.live-test.ravendb.net",
-app.post('/api/items', function (req, res) {
-    const { content } = req.body;
-    const session = docStore.openSession();
-    session.store({
-        content: content,
-        createdAt: new Date(),
-        isChecked: false
-    }, null, "TodoItems")
-    .then(() => session.saveChanges())
-    .then(() => res.sendStatus(200));
-});
+    .put(function (req, res) {
+        const { id, isChecked } = req.body;
+        const session = docStore.openSession();
+        session.load(id)
+            .then(doc => {
+                if (!doc) {
+                    throw new VError({
+                        name: "ItemNotFound",
+                        info: {
+                            id
+                        }
+                    });
+                }
+                
+                doc.isChecked = isChecked;
+                return session.saveChanges();
+            })
+            .then(() => res.sendStatus(200))
+            .catch(err => {
+                if (err && err.name === "ItemNotFound") {
+                    res.sendStatus(404);
+                    return;
+                }
 
-app.delete('/api/items', function (req, res) {
-    const { id } = req.body;
-    const session = docStore.openSession();
-    session.delete(id)
+                res.status(500);
+                res.send(err);
+            });
+    })
+    .delete(function (req, res) {
+        const { id } = req.body;
+        const session = docStore.openSession();
+        session.delete(id)
         .then(() => session.saveChanges())
         .then(() => res.sendStatus(200));
-});
+    });
 
 const indexes = [
     new IndexDefinition(
-    "TodoItemsIndex",
-    `from item 
+        "TodoItemsIndex",
+        `from item 
      in docs.TodoItems 
      select new { 
          createdAt = item.createdAt, 

@@ -42,21 +42,29 @@
         .todo li {
             margin: 3px 0;
             padding: 10px;
-            display: block;
+            display: flex;
             background-color: rgba(255, 255, 255, 0.5);
             border-bottom: rgba(255, 255, 255, 0.6);
         }
 
-        .todo li.done {
+        .todo li .content {
+            flex-grow: 1;
+        }
+
+        .todo li.done .content {
             text-decoration: line-through;
         }
 
         .todo li .remove {
-            float: right;
             padding: 3px;
             color: red;
             font-weight: bold;
             text-decoration: none;
+        }
+
+        .todo li .createdAt {
+            color: #bbb;
+            margin-top: 7px;
         }
     </style>
 
@@ -71,7 +79,9 @@
         </div>
         <ul class="col-sm-12 todo this-week" style="display: none;" v-show="todoItems.length">
             <li v-for="todo in todoItems" v-bind:class="{ done: todo.isChecked }">
-                <input type="checkbox" v-model="todo.isChecked"> {{ todo.content }}
+                <input type="checkbox" v-on:change="toggleCheckItem(todo)" v-model="todo.isChecked"> 
+                <span class="content">{{ todo.content }}</span>
+                <small class="createdAt">{{ formatDate(todo.createdAt) }}</small>
                 <a href="#" class="remove" v-on:click="removeItem(todo)">✘</a>
             </li>
         </ul>
@@ -94,6 +104,19 @@
                         .then(JSON.parse)
                         .done((items) => {
                             this.todoItems = items;
+                        });
+                },
+                toggleCheckItem(item) {
+                    request('PUT', '/api/items', {
+                            "json": { 
+                                id: item.id,
+                                isChecked: item.isChecked
+                            }
+                        })
+                        .catch(err => {
+                            var idx = this.todoItems.indexOf(item);
+                            this.todoItems.splice(idx, 1);
+                            throw err;
                         });
                 },
                 addItem() {
@@ -123,6 +146,10 @@
                             this.todoItems.splice(idx, 0, item);
                             throw err;
                         });
+                },
+                formatDate(dateString) {
+                    var date = new Date(dateString);
+                    return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()} ${date.getHours()}:${date.getMinutes()}`;
                 },
                 initialize() {
                     this.getItems();

@@ -1,6 +1,5 @@
 const path = require('path');
-const VError = require('verror');
-const { DocumentStore, PutIndexesOperation, IndexDefinition } = require('ravendb');
+const { DocumentStore } = require('ravendb');
 const express = require('express');
 const bodyParser = require('body-parser');
 
@@ -22,7 +21,7 @@ app.route('/api/items')
         const session = docStore.openSession();
 
         const result = await session.query({
-            indexName: 'TodoItemsIndex',
+            documentType: 'TodoItems',
         })
         .orderByDescending('createdAt')
         .waitForNonStaleResults()
@@ -55,6 +54,7 @@ app.route('/api/items')
         const doc = await session.load(id)
         if (!doc) {
             res.sendStatus(404);
+            return;
         }
                 
         doc.isChecked = isChecked;
@@ -69,24 +69,6 @@ app.route('/api/items')
         res.sendStatus(200);
     });
 
-const indexes = [
-    new IndexDefinition(
-        "TodoItemsIndex",
-        `from item 
-     in docs.TodoItems 
-     select new { 
-         createdAt = item.createdAt, 
-         isChecked = item.isChecked
-     }`)
-];
-
-function setupDatabase() {
-    const putIndexes = new PutIndexesOperation(indexes);
-    docStore.admin.send(putIndexes);
-}
-
-
-setupDatabase();
 app.listen(3000, function () {
     console.log('Example app listening on port 3000!');
 });

@@ -11,6 +11,7 @@
   "dependencies": {
     "body-parser": "^1.18.2",
     "express": "^4.16.1",
+    "ravendb": "^4.0.0-rc1",
     "verror": "^1.10.0"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 {
     "ravendb": {
-        "url": "http://gregolsky-pc:8080",
+        "url": "http://4.live-test.ravendb.net:8080",
         "database": "node-app"
     }
 }

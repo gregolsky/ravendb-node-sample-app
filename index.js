@@ -17,21 +17,26 @@ app.get('/', function (req, res) {
 });
 
 app.route('/api/items')
-    .get(async (req, res) => {
-        const session = docStore.openSession();
+    .get(async (req, res, next) => {
+        let result;
 
-        const result = await session.query({
-            documentType: 'TodoItems',
-        })
-        .orderByDescending('createdAt')
-        .waitForNonStaleResults()
-        .all();
+        try {
+            const session = docStore.openSession();
+            result = await session.query({
+                documentType: 'TodoItems',
+            })
+            .orderByDescending('createdAt')
+            .waitForNonStaleResults()
+            .all();
+        } catch (err) {
+            next(err);
+        }
 
         res.status(200);
         res.type("application/json");
         res.send(JSON.stringify(result));
     })
-    .post(async (req, res) => {
+    .post(async (req, res, next) => {
         const { content } = req.body;
         const session = docStore.openSession();
         const item = {
@@ -40,32 +45,46 @@ app.route('/api/items')
             isChecked: false
         };
 
-        await session.store(item, null, "TodoItems");
-        await session.saveChanges();
+        try {
+            await session.store(item, null, "TodoItems");
+            await session.saveChanges();
+        } catch (err) {
+            next(err);
+        }
 
         res.status(200)
             .type("application/json")
             .send(JSON.stringify(item));
     })
-    .put(async (req, res) => {
+    .put(async (req, res, next) => {
         const { id, isChecked } = req.body;
         const session = docStore.openSession();
-        
-        const doc = await session.load(id)
-        if (!doc) {
-            res.sendStatus(404);
-            return;
+
+        try {
+            const doc = await session.load(id)
+            if (!doc) {
+                res.sendStatus(404);
+                return;
+            }
+
+            doc.isChecked = isChecked;
+            await session.saveChanges();
+        } catch (err) {
+            next(err);
         }
-                
-        doc.isChecked = isChecked;
-        await session.saveChanges();
+
         res.sendStatus(200);
     })
-    .delete(async (req, res) => {
+    .delete(async (req, res, next) => {
         const { id } = req.body;
         let session = docStore.openSession();
-        await session.delete(id);
-        await session.saveChanges();
+        try {
+            await session.delete(id);
+            await session.saveChanges();
+        } catch (err) {
+            next(err);
+        }
+
         res.sendStatus(200);
     });
 

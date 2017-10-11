@@ -1,5 +1,4 @@
 const path = require('path');
-const VError = require('verror');
 const { DocumentStore, PutIndexesOperation, IndexDefinition } = require('ravendb');
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -18,7 +17,7 @@ app.get('/', function (req, res) {
 });
 
 app.route('/api/items')
-    .get(function (req, res) {
+    .get(function (req, res, next) {
         const session = docStore.openSession();
 
         session.query({
@@ -33,11 +32,10 @@ app.route('/api/items')
             res.send(JSON.stringify(result));
         })
         .catch(reason => {
-            res.status(500);
-            res.send(reason);
+            next(reason);
         });
     })
-    .post(function (req, res) {
+    .post(function (req, res, next) {
         const { content } = req.body;
         const session = docStore.openSession();
         const item = {
@@ -53,7 +51,7 @@ app.route('/api/items')
             res.send(JSON.stringify(item));
         });
     })
-    .put(function (req, res) {
+    .put(function (req, res, next) {
         const { id, isChecked } = req.body;
         const session = docStore.openSession();
         session.load(id)
@@ -77,42 +75,21 @@ app.route('/api/items')
                     return;
                 }
 
-                res.status(500);
-                res.send(err);
+                next(err);
             });
     })
-    .delete(function (req, res) {
+    .delete(function (req, res, next) {
         const { id } = req.body;
         const session = docStore.openSession();
         session.delete(id)
         .then(() => session.saveChanges())
         .then(() => res.sendStatus(200))
         .catch(err => { 
-            res.status(500);
-            res.send(err);
+            next(err)
         });
     });
 
-const indexes = [
-    new IndexDefinition(
-        "TodoItemsIndex",
-        `from item 
-     in docs.TodoItems 
-     select new { 
-         createdAt = item.createdAt, 
-         isChecked = item.isChecked
-     }`)
-];
-
-function setupDatabase() {
-    const putIndexes = new PutIndexesOperation(indexes);
-    docStore.admin.send(putIndexes);
-    return Promise.resolve();
-}
-
-setupDatabase().then(() => {
-    app.listen(3000, function () {
-        console.log('Example app listening on port 3000!');
-    });
+app.listen(3000, function () {
+    console.log('Example app listening on port 3000!');
 });
 

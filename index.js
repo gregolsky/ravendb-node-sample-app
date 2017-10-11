@@ -18,26 +18,21 @@ app.get('/', function (req, res) {
 });
 
 app.route('/api/items')
-    .get(function (req, res) {
+    .get(async (req, res) => {
         const session = docStore.openSession();
 
-        session.query({
+        const result = await session.query({
             indexName: 'TodoItemsIndex',
         })
         .orderByDescending('createdAt')
         .waitForNonStaleResults()
-        .all()
-        .then(result => {
-            res.status(200);
-            res.type("application/json");
-            res.send(JSON.stringify(result));
-        })
-        .catch(reason => {
-            res.status(500);
-            res.send(reason);
-        });
+        .all();
+
+        res.status(200);
+        res.type("application/json");
+        res.send(JSON.stringify(result));
     })
-    .post(function (req, res) {
+    .post(async (req, res) => {
         const { content } = req.body;
         const session = docStore.openSession();
         const item = {
@@ -45,52 +40,33 @@ app.route('/api/items')
             createdAt: new Date(),
             isChecked: false
         };
-        session.store(item, null, "TodoItems")
-        .then(() => session.saveChanges())
-        .then(() => { 
-            res.status(200);
-            res.type("application/json");
-            res.send(JSON.stringify(item));
-        });
+
+        await session.store(item, null, "TodoItems");
+        await session.saveChanges();
+
+        res.status(200)
+            .type("application/json")
+            .send(JSON.stringify(item));
     })
-    .put(function (req, res) {
+    .put(async (req, res) => {
         const { id, isChecked } = req.body;
         const session = docStore.openSession();
-        session.load(id)
-            .then(doc => {
-                if (!doc) {
-                    throw new VError({
-                        name: "ItemNotFound",
-                        info: {
-                            id
-                        }
-                    });
-                }
+        
+        const doc = await session.load(id)
+        if (!doc) {
+            res.sendStatus(404);
+        }
                 
-                doc.isChecked = isChecked;
-                return session.saveChanges();
-            })
-            .then(() => res.sendStatus(200))
-            .catch(err => {
-                if (err && err.name === "ItemNotFound") {
-                    res.sendStatus(404);
-                    return;
-                }
-
-                res.status(500);
-                res.send(err);
-            });
+        doc.isChecked = isChecked;
+        await session.saveChanges();
+        res.sendStatus(200);
     })
-    .delete(function (req, res) {
+    .delete(async (req, res) => {
         const { id } = req.body;
-        const session = docStore.openSession();
-        session.delete(id)
-        .then(() => session.saveChanges())
-        .then(() => res.sendStatus(200))
-        .catch(err => { 
-            res.status(500);
-            res.send(err);
-        });
+        let session = docStore.openSession();
+        await session.delete(id);
+        await session.saveChanges();
+        res.sendStatus(200);
     });
 
 const indexes = [
@@ -107,12 +83,11 @@ const indexes = [
 function setupDatabase() {
     const putIndexes = new PutIndexesOperation(indexes);
     docStore.admin.send(putIndexes);
-    return Promise.resolve();
 }
 
-setupDatabase().then(() => {
-    app.listen(3000, function () {
-        console.log('Example app listening on port 3000!');
-    });
+
+setupDatabase();
+app.listen(3000, function () {
+    console.log('Example app listening on port 3000!');
 });
 

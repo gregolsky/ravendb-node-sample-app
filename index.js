@@ -12,31 +12,33 @@ const app = express()
 app.use(bodyParser.json()); // support json encoded bodies
 app.use(bodyParser.urlencoded({ extended: true })); // support encoded bodies
 
+const handleErrors = fn =>
+    (req, res, next) => {
+        Promise.resolve(fn(req, res, next))
+            .catch(next);
+    };
+
 app.get('/', function (req, res) {
     res.sendFile(path.join(__dirname, "index.html"));
 });
 
 app.route('/api/items')
-    .get(async (req, res, next) => {
+    .get(handleErrors(async (req, res, next) => {
         let result;
 
-        try {
-            const session = docStore.openSession();
-            result = await session.query({
-                documentType: 'TodoItems',
-            })
+        const session = docStore.openSession();
+        result = await session.query({
+            documentType: 'TodoItems',
+        })
             .orderByDescending('createdAt')
             .waitForNonStaleResults()
             .all();
-        } catch (err) {
-            next(err);
-        }
 
         res.status(200);
         res.type("application/json");
         res.send(JSON.stringify(result));
-    })
-    .post(async (req, res, next) => {
+    }))
+    .post(handleErrors(async (req, res, next) => {
         const { content } = req.body;
         const session = docStore.openSession();
         const item = {
@@ -45,48 +47,36 @@ app.route('/api/items')
             isChecked: false
         };
 
-        try {
-            await session.store(item, null, "TodoItems");
-            await session.saveChanges();
-        } catch (err) {
-            next(err);
-        }
+        await session.store(item, null, "TodoItems");
+        await session.saveChanges();
 
         res.status(200)
             .type("application/json")
             .send(JSON.stringify(item));
-    })
-    .put(async (req, res, next) => {
+    }))
+    .put(handleErrors(async (req, res, next) => {
         const { id, isChecked } = req.body;
         const session = docStore.openSession();
 
-        try {
-            const doc = await session.load(id)
-            if (!doc) {
-                res.sendStatus(404);
-                return;
-            }
-
-            doc.isChecked = isChecked;
-            await session.saveChanges();
-        } catch (err) {
-            next(err);
+        const doc = await session.load(id)
+        if (!doc) {
+            res.sendStatus(404);
+            return;
         }
 
+        doc.isChecked = isChecked;
+        await session.saveChanges();
+
         res.sendStatus(200);
-    })
-    .delete(async (req, res, next) => {
+    }))
+    .delete(handleErrors(async (req, res, next) => {
         const { id } = req.body;
         let session = docStore.openSession();
-        try {
-            await session.delete(id);
-            await session.saveChanges();
-        } catch (err) {
-            next(err);
-        }
+        await session.delete(id);
+        await session.saveChanges();
 
         res.sendStatus(200);
-    });
+    }));
 
 app.listen(3000, function () {
     console.log('Example app listening on port 3000!');

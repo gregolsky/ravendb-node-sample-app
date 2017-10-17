@@ -21,7 +21,7 @@ app.route('/api/items')
         const session = docStore.openSession();
 
         session.query({
-            indexName: 'TodoItemsIndex',
+            documentType: 'TodoItems'
         })
         .orderByDescending('createdAt')
         .waitForNonStaleResults()

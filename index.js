@@ -28,7 +28,7 @@ app.route('/api/items')
 
         const session = docStore.openSession();
         result = await session.query({
-            documentType: 'TodoItems',
+            collection: 'TodoItems',
         })
             .orderByDescending('createdAt')
             .waitForNonStaleResults()
@@ -47,7 +47,7 @@ app.route('/api/items')
             isChecked: false
         };
 
-        await session.store(item, null, "TodoItems");
+        await session.store(item, null, { documentType: "TodoItem" });
         await session.saveChanges();
 
         res.status(200)

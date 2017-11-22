@@ -21,7 +21,7 @@ app.route('/api/items')
         const session = docStore.openSession();
 
         session.query({
-            documentType: 'TodoItems'
+            collection: 'TodoItems'
         })
         .orderByDescending('createdAt')
         .waitForNonStaleResults()
@@ -43,7 +43,7 @@ app.route('/api/items')
             createdAt: new Date(),
             isChecked: false
         };
-        session.store(item, null, "TodoItems")
+        session.store(item, "TodoItems/")
         .then(() => session.saveChanges())
         .then(() => { 
             res.status(200);

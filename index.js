@@ -43,7 +43,7 @@ app.route('/api/items')
             createdAt: new Date(),
             isChecked: false
         };
-        session.store(item, "TodoItems/")
+        session.store(item, null, { documentType: "TodoItem" })
         .then(() => session.saveChanges())
         .then(() => { 
             res.status(200);

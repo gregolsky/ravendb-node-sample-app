@@ -1,84 +1,126 @@
 const path = require('path');
-const { DocumentStore } = require('ravendb');
+const {
+    DocumentStore,
+    GetDatabaseNamesOperation,
+    CreateDatabaseOperation
+} = require('ravendb');
 const express = require('express');
 const bodyParser = require('body-parser');
 
 const settings = require('./settings.json');
 
-const docStore = DocumentStore.create(settings.ravendb.url, settings.ravendb.database);
+class TodoItem {
+    constructor(opts) {
+        opts = opts || {};
+        this.content = opts.content;
+        this.createdAt = opts.createdAt;
+        this.isChecked = opts.isChecked || false;
+    }
+}
+
+const docStore = new DocumentStore(settings.ravendb.url, settings.ravendb.database);
+// register entity type in conventions
+// so that load() and query() knows how to instantiate it
+docStore.conventions.registerEntityType(TodoItem);
 docStore.initialize();
 
-const app = express()
-app.use(bodyParser.json()); // support json encoded bodies
-app.use(bodyParser.urlencoded({ extended: true })); // support encoded bodies
+(async function () {
+    await bootstrap()
+    webapp();
+})()
 
-const handleErrors = fn =>
-    (req, res, next) => {
-        Promise.resolve(fn(req, res, next))
-            .catch(next);
-    };
+async function bootstrap() {
+    return docStore.operations.send(new GetDatabaseNamesOperation(0, 100))
+        .then(databaseNamesResult => {
+            if (databaseNamesResult.includes(settings.ravendb.database)) {
+                return;
+            }
 
-app.get('/', function (req, res) {
-    res.sendFile(path.join(__dirname, "index.html"));
-});
+            return docStore.operations.send(new CreateDatabaseOperation({
+                databaseName: settings.ravendb.database
+            }));
+        });
+}
 
-app.route('/api/items')
-    .get(handleErrors(async (req, res, next) => {
-        let result;
+function webapp() {
+    const app = express()
+    app.use(bodyParser.json()); // support json encoded bodies
+    app.use(bodyParser.urlencoded({
+        extended: true
+    })); // support encoded bodies
 
-        const session = docStore.openSession();
-        result = await session.query({
-            collection: 'TodoItems',
-        })
-            .orderByDescending('createdAt')
-            .waitForNonStaleResults()
-            .all();
-
-        res.status(200);
-        res.type("application/json");
-        res.send(JSON.stringify(result));
-    }))
-    .post(handleErrors(async (req, res, next) => {
-        const { content } = req.body;
-        const session = docStore.openSession();
-        const item = {
-            content: content,
-            createdAt: new Date(),
-            isChecked: false
+    const handleErrors = fn =>
+        (req, res, next) => {
+            Promise.resolve(fn(req, res, next)).catch(next);
         };
 
-        await session.store(item, null, { documentType: "TodoItem" });
-        await session.saveChanges();
 
-        res.status(200)
-            .type("application/json")
-            .send(JSON.stringify(item));
-    }))
-    .put(handleErrors(async (req, res, next) => {
-        const { id, isChecked } = req.body;
-        const session = docStore.openSession();
+    app.get('/', function (req, res) {
+        res.sendFile(path.join(__dirname, "index.html"));
+    });
 
-        const doc = await session.load(id)
-        if (!doc) {
-            res.sendStatus(404);
-            return;
-        }
+    app.route('/api/items')
+        .get(handleErrors(async (req, res, next) => {
+            let result;
 
-        doc.isChecked = isChecked;
-        await session.saveChanges();
+            const session = docStore.openSession();
+            result = await session.query(TodoItem)
+                .orderByDescending('createdAt')
+                .waitForNonStaleResults()
+                .all();
 
-        res.sendStatus(200);
-    }))
-    .delete(handleErrors(async (req, res, next) => {
-        const { id } = req.body;
-        let session = docStore.openSession();
-        await session.delete(id);
-        await session.saveChanges();
+            res.status(200);
+            res.type("application/json");
+            res.send(JSON.stringify(result));
+        }))
+        .post(handleErrors(async (req, res, next) => {
+            const {
+                content
+            } = req.body;
+            const session = docStore.openSession();
+            const item = new TodoItem({
+                content: content,
+                createdAt: new Date(),
+                isChecked: false
+            });
 
-        res.sendStatus(200);
-    }));
+            await session.store(item);
+            await session.saveChanges();
 
-app.listen(3000, function () {
-    console.log('Example app listening on port 3000!');
-});
+            res.status(200)
+                .type("application/json")
+                .send(JSON.stringify(item));
+        }))
+        .put(handleErrors(async (req, res, next) => {
+            const {
+                id,
+                isChecked
+            } = req.body;
+            const session = docStore.openSession();
 
+            const doc = await session.load(id)
+            if (!doc) {
+                res.sendStatus(404);
+                return;
+            }
+
+            doc.isChecked = isChecked;
+            await session.saveChanges();
+
+            res.sendStatus(200);
+        }))
+        .delete(handleErrors(async (req, res, next) => {
+            const {
+                id
+            } = req.body;
+            let session = docStore.openSession();
+            await session.delete(id);
+            await session.saveChanges();
+
+            res.sendStatus(200);
+        }));
+
+    app.listen(3000, function () {
+        console.log('Example app listening on port 3000!');
+    });
+}

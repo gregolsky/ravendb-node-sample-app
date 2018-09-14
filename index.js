@@ -30,16 +30,18 @@ docStore.initialize();
 })()
 
 async function bootstrap() {
-    return docStore.operations.send(new GetDatabaseNamesOperation(0, 100))
-        .then(databaseNamesResult => {
-            if (databaseNamesResult.includes(settings.ravendb.database)) {
-                return;
-            }
-
-            return docStore.operations.send(new CreateDatabaseOperation({
+    try {
+        const names = await docStore.maintenance.server.send(new GetDatabaseNamesOperation(0, 50));
+        if (names.indexOf(settings.ravendb.database) === -1) {
+            await docStore.maintenance.server.send(new CreateDatabaseOperation({
                 databaseName: settings.ravendb.database
             }));
-        });
+        }
+    } catch (err) {
+        if (err.name === "DatabaseDoesNotExistException") {
+            return;
+        }
+    }
 }
 
 function webapp() {
